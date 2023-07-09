@@ -1,4 +1,4 @@
-# Pluto.jl Notebook Mode for Emacs
+# Pluto.jl edit mode for Emacs
 
 This Emacs minor mode allows provides you with some minor convenience functionality when editing `.jl` files compatible with Pluto.jl.
 
