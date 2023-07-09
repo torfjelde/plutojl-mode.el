@@ -207,6 +207,17 @@ If region is active, make the region the body of the cell."
             (delete-region start end)
             (plutojl--delete-from-cell-order uuid))))))
 
+(defun plutojl--is-plutojl-notebook ()
+  "Return non-nil if the current buffer is a Pluto.jl notebook."
+  (save-excursion
+    (goto-char (point-min))
+    (re-search-forward plutojl--cell-uuid-regexp nil t)))
+
+(defun plutojl-maybe-enable-plutojl-mode ()
+  "Enable `plutojl-mode' if the buffer is a Pluto.jl notebook."
+  (when (plutojl--is-plutojl-notebook)
+    (plutojl-mode 1)))
+
 ;; Let's make this a minor mode.
 (define-minor-mode plutojl-mode
   "Minor mode for editing Pluto.jl notebooks."

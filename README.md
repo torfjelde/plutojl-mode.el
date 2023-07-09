@@ -39,10 +39,10 @@ To enable the Pluto.jl Notebook Mode, add the following line to your Emacs confi
 (plutojl-mode)
 ```
 
-Alternatively, you can enable the mode for specific file types using `auto-mode-alist`. For example, to enable the mode for files with the `.jl` extension, add the following to your configuration:
+Alternatively, you can conditionally enable `plutojs-mode` upon activation of, say, `julia-mode`, using the provided convenience method `plutojl-maybe-enable-plutojl-mode`:
 
 ```emacs-lisp
-(add-to-list 'auto-mode-alist '("\\.jl\\'" . plutojl-mode))
+(add-hook 'julia-mode-hook #'plutojl-maybe-enable-plutojl-mode)
 ```
 
 ### Keybindings
