@@ -4,7 +4,7 @@ This Emacs minor mode allows provides you with some minor convenience functional
 
 _Note that this is an independent piece of work and is in no way connected to the Pluto.jl project._
 
-***Warning!!!** This project is still in early development, and so any use is at your own risk.
+**Warning!!!** This project is still in early development, and so any use is at your own risk.
 
 ## Installation
 
