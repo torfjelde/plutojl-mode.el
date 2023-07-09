@@ -242,9 +242,13 @@ If region is active, make the region the body of the cell."
       (beginning-of-line)
       (if (looking-at "^# ╟─[A-Za-z0-9\\-]+$")
           ;; Unfold.
-          (replace-match (plutojl--make-cell-order-list-entry uuid nil))
+          (progn
+            (replace-match (plutojl--make-cell-order-list-entry uuid nil))
+            (message "Unfolded cell %s" uuid))
         ;; Fold.
-        (replace-match (plutojl--make-cell-order-list-entry uuid t))))))
+        (progn
+          (replace-match (plutojl--make-cell-order-list-entry uuid t))
+          (message "Folded cell %s" uuid))))))
 
 (defun plutojl--is-plutojl-notebook ()
   "Return non-nil if the current buffer is a Pluto.jl notebook."
