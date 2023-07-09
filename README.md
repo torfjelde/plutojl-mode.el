@@ -2,11 +2,13 @@
 
 This Emacs minor mode allows provides you with some minor convenience functionality when editing `.jl` files compatible with Pluto.jl.
 
+_Note that this is an independent piece of work and is in no way connected to the Pluto.jl project._
+
 ## Installation
 
 ### Prerequisites
 
-Before installing the Pluto.jl Notebook Mode, please make sure you have the following dependencies installed:
+Before installing the Pluto.jl mode, please make sure you have the following dependencies installed:
 
 - [Emacs](https://www.gnu.org/software/emacs/) (version 26 or higher)
 - [Julia](https://julialang.org/) (version 1.0 or higher)
