@@ -20,30 +20,46 @@
 (defconst plutojl--cell-uuid-regexp
   "^# ╔═╡ \\([0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}\\)$")
 
+(defconst plutojl--cell-order-list-regexp
+  "^# ╔═╡ Cell order:")
+
 (defconst plutojl--project-toml-regexp
   "^# ╔═╡ 00000000-0000-0000-0000-000000000001$")
 
 (defconst plutojl--manifest-toml-regexp
   "^# ╔═╡ 00000000-0000-0000-0000-000000000002$")
 
-(defun plutojl--make-cell-order-pattern (uuid)
+(defun plutojl--make-cell-order-regexp (uuid)
   "Return a regexp pattern for matching `uuid' in the cell order list."
   (format "^# \\(╟─\\|╠═\\)%s$" uuid))
 
-(defun plutojl--insert-cell-in-order-list-at-point (uuid &optional folded)
-  "Insert a cell UUID in the cell order list at point."
-  (insert (format "# %s%s\n"
-                  (if folded "╟─" "╠═")
-                  uuid)))
+(defun plutojl--make-cell-order-list-entry (uuid &optional folded)
+  "Return a string for inserting `uuid' in the cell order list."
+  (format "# %s%s"
+          (if folded "╟─" "╠═")
+          uuid))
 
-(defun plutojl--go-to-cell-order ()
+(defun plutojl--go-to-cell-order-list ()
   "Go to the cell order list."
   ;; The cell order list is identified by `# ╔═╡ Cell order:'
   ;; It is a list of UUIDs, one per line.
-  (goto-char (point-min))
-  (if (re-search-forward "^# ╔═╡ Cell order:" nil t)
-      (line-beginning-position)
-    (error "No cell order list found")))
+  (let ((pom (point)))
+    (goto-char (point-min))
+    (if (re-search-forward plutojl--cell-order-list-regexp nil t)
+        (goto-char (match-beginning 0))
+      ;; Go back otherwise.
+      (progn
+        (goto-char pom)
+        (error "No cell order list found")))))
+
+(defun plutojl--current-cell-uuid ()
+  "Return the UUID of the current cell."
+  (save-excursion
+    (forward-line)
+    (if (re-search-backward plutojl--cell-uuid-regexp nil t)
+        ;; Get the match without fontification.
+        (buffer-substring-no-properties (match-beginning 1) (match-end 1))
+      (error "No cell found at point"))))
 
 (defun plutojl--insert-cell-order-after (uuid previous-uuid &optional folded)
   "Insert `uuid' in the cell order list after `previous-uuid'."
@@ -51,16 +67,17 @@
   ;; If it is found, insert `uuid' after it.
   ;; If it is not found, insert `uuid' at the end of the list.
   (save-excursion
-    (plutojl--go-to-cell-order)
+    (plutojl--go-to-cell-order-list)
     ;; The list entries are either of the form
     ;; `# ╟─ 52f6010d-ad5f-4e29-8d79-7fdf1d8acf92'
     ;; or
     ;; `# ╠═ 52f6010d-ad5f-4e29-8d79-7fdf1d8acf92'
     ;; where `╟─'  indicates it's folded and `╠═' indicates it's unfolded.
-    (if (re-search-forward (plutojl--make-cell-order-pattern previous-uuid) nil t)
+    (if (re-search-forward (plutojl--make-cell-order-regexp previous-uuid) nil t)
         (progn
           (forward-line)
-          (plutojl--insert-cell-in-order-list-at-point uuid folded))
+          (insert (plutojl--make-cell-order-list-entry uuid folded))
+          (insert "\n"))
       (error "No cell with UUID %s found" previous-uuid))))
 
 (defun plutojl--insert-cell-order-before (uuid next-uuid &optional folded)
@@ -69,23 +86,24 @@
   ;; If it is found, insert `uuid' before it.
   ;; If it is not found, insert `uuid' at the end of the list.
   (save-excursion
-    (plutojl--go-to-cell-order)
+    (plutojl--go-to-cell-order-list)
     ;; The list entries are either of the form
     ;; `# ╟─ 52f6010d-ad5f-4e29-8d79-7fdf1d8acf92'
     ;; or
     ;; `# ╠═ 52f6010d-ad5f-4e29-8d79-7fdf1d8acf92'
     ;; where `╟─'  indicates it's folded and `╠═' indicates it's unfolded.
-    (if (re-search-forward (plutojl--make-cell-order-pattern next-uuid) nil t)
+    (if (re-search-forward (plutojl--make-cell-order-regexp next-uuid) nil t)
         (progn
           (beginning-of-line)
-          (plutojl--insert-cell-in-order-list-at-point uuid folded))
+          (insert (plutojl--make-cell-order-list-entry uuid folded))
+          (insert "\n"))
       (error "No cell with UUID %s found" next-uuid))))
 
 (defun plutojl--cell-exists-in-cell-order-p (uuid)
   "Return non-nil if `uuid' exists in the cell order list."
   (save-excursion
-    (plutojl--go-to-cell-order)
-    (re-search-forward (plutojl--make-cell-order-pattern uuid) nil t)))
+    (plutojl--go-to-cell-order-list)
+    (re-search-forward (plutojl--make-cell-order-regexp uuid) nil t)))
 
 (defun plutojl--add-to-cell-order (uuid &optional previous-uuid next-uuid folded)
   "Add `uuid' to the cell order list."
@@ -100,13 +118,14 @@
       ;; Otherwise we go the last line of the buffer and insert the UUID there.
       (progn
         (goto-char (point-max))
-        (plutojl--insert-cell-in-order-list-at-point uuid folded)))))
+        (insert (plutojl--make-cell-order-list-entry uuid folded))
+        (insert "\n")))))
 
 (defun plutojl--delete-from-cell-order (uuid)
   "Delete `uuid' from the cell order list."
   (save-excursion
-    (plutojl--go-to-cell-order)
-    (when (re-search-forward (plutojl--make-cell-order-pattern uuid) nil t)
+    (plutojl--go-to-cell-order-list)
+    (when (re-search-forward (plutojl--make-cell-order-regexp uuid) nil t)
       (beginning-of-line)
       (kill-line)
       (kill-line))))
@@ -181,7 +200,6 @@ If region is active, make the region the body of the cell."
       ;; Go back otherwise.
       (goto-char pom))))
 
-
 (defun plutojl-delete-cell-at-point ()
   "Delete the cell at point."
   (interactive)
@@ -207,6 +225,27 @@ If region is active, make the region the body of the cell."
             (delete-region start end)
             (plutojl--delete-from-cell-order uuid))))))
 
+(defun plutojl-goto-cell-order-list ()
+  "Go to the cell order list."
+  (interactive)
+  (plutojl--go-to-cell-order-list))
+
+(defun plutojl-toggle-fold-cell ()
+  "Fold the cell at point."
+  (interactive)
+  (let ((uuid (plutojl--current-cell-uuid)))
+    (save-excursion
+      ;; Replace the cell UUID in the cell order list with a folded cell.
+      (plutojl-goto-cell-order-list)
+      ;; Replace.
+      (re-search-forward (plutojl--make-cell-order-regexp uuid))
+      (beginning-of-line)
+      (if (looking-at "^# ╟─[A-Za-z0-9\\-]+$")
+          ;; Unfold.
+          (replace-match (plutojl--make-cell-order-list-entry uuid nil))
+        ;; Fold.
+        (replace-match (plutojl--make-cell-order-list-entry uuid t))))))
+
 (defun plutojl--is-plutojl-notebook ()
   "Return non-nil if the current buffer is a Pluto.jl notebook."
   (save-excursion
@@ -227,6 +266,7 @@ If region is active, make the region the body of the cell."
             (define-key map (kbd "C-c C-d") 'plutojl-delete-cell-at-point)
             (define-key map (kbd "C-c C-p") 'plutojl-goto-previous-cell)
             (define-key map (kbd "C-c C-n") 'plutojl-goto-next-cell)
+            (define-key map (kbd "C-c C-f") 'plutojl-toggle-fold-cell)
             map))
 
 (provide 'plutojl-mode)
