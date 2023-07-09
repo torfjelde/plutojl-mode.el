@@ -50,6 +50,10 @@ Alternatively, you can conditionally enable `plutojs-mode` upon activation of, s
 ### Keybindings
 
 - `plutojl-insert-cell-at-point` (`C-c C-c`): Insert a new Pluto.jl notebook cell at the current point.
+- `plutojl-delete-cell-at-point` (`C-c C-d`): Delete the Pluto.jl notebook cell at the current point.
+- `plutojl-goto-previous-cell` (`C-c C-p`): Move to the previous Pluto.jl notebook cell.
+- `plutojl-goto-next-cell` (`C-c C-n`): Move to the next Pluto.jl notebook cell.
+- `plutojl-toggle-fold-cell` (`C-c C-f`): Toggle folding of the Pluto.jl notebook cell at the current point.
 
 ### Interacting with Pluto.jl
 
