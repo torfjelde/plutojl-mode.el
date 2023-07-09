@@ -29,6 +29,9 @@
 (defconst plutojl--manifest-toml-regexp
   "^# ╔═╡ 00000000-0000-0000-0000-000000000002$")
 
+;; TODO: Add support for disabling code blocks, etc.
+;; More generally, add support for metadata.
+
 (defun plutojl--make-cell-order-regexp (uuid)
   "Return a regexp pattern for matching `uuid' in the cell order list."
   (format "^# \\(╟─\\|╠═\\)%s$" uuid))
@@ -218,7 +221,7 @@ If region is active, make the region the body of the cell."
         (let ((uuid (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
           ;; Now we locate the next cell.
           (when (not (plutojl-goto-next-cell))
-            (when (not (plutojl-goto-cell-order))
+            (when (not (plutojl-goto-cell-order-list))
               (error "No cell or cell order found; is this a Pluto.jl notebook?")))
 
           (let ((end (point)))
