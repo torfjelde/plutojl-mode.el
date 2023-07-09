@@ -20,6 +20,12 @@
 (defconst plutojl--cell-uuid-regexp
   "^# ╔═╡ \\([0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}\\)$")
 
+(defconst plutojl--project-toml-regexp
+  "^# ╔═╡ 00000000-0000-0000-0000-000000000001$")
+
+(defconst plutojl--manifest-toml-regexp
+  "^# ╔═╡ 00000000-0000-0000-0000-000000000002$")
+
 (defun plutojl--make-cell-order-pattern (uuid)
   "Return a regexp pattern for matching `uuid' in the cell order list."
   (format "^# \\(╟─\\|╠═\\)%s$" uuid))
@@ -154,6 +160,27 @@ If region is active, make the region the body of the cell."
     (forward-line))
   (when (re-search-forward plutojl--cell-uuid-regexp nil t)
     (goto-char (match-beginning 0))))
+
+(defun plutojl-goto-project-toml ()
+  "Go to the Project.toml section."
+  (interactive)
+  (let ((pom (point)))
+    (goto-char (point-min))
+    (if (re-search-forward plutojl--project-toml-regexp nil t)
+        (goto-char (match-beginning 0))
+      ;; Go back otherwise.
+      (goto-char pom))))
+
+(defun plutojl-goto-manifest-toml ()
+  "Go to the Manifest.toml section."
+  (interactive)
+  (let ((pom (point)))
+    (goto-char (point-min))
+    (if (re-search-forward plutojl--manifest-toml-regexp nil t)
+        (goto-char (match-beginning 0))
+      ;; Go back otherwise.
+      (goto-char pom))))
+
 
 (defun plutojl-delete-cell-at-point ()
   "Delete the cell at point."
