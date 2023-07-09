@@ -19,7 +19,8 @@ To install the Pluto.jl Notebook Mode using [straight.el](https://github.com/rax
 1. Open your Emacs configuration file (usually `~/.emacs.d/init.el` or `~/.emacs`) and add the following code:
 
    ```emacs-lisp
-   (use-package plutojl-mode :straight (plutojl-mode :type git :host github :repo "torfjelde/plutojl-mode.el"))
+   (use-package plutojl-mode
+     :straight (plutojl-mode :type git :host github :repo "torfjelde/plutojl-mode.el"))
    ```
 
 2. Restart Emacs or evaluate the configuration by running `M-x eval-buffer`.
