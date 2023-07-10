@@ -48,7 +48,7 @@ Once you have installed the `plutojl-mode`, you can start editing Pluto.jl noteb
 
 ### Enabling the Mode
 
-To enable the Pluto.jl Notebook Mode, add the following line to your Emacs configuration file:
+To enable the Pluto.jl mode, you can just call
 
 ```emacs-lisp
 (plutojl-mode)
