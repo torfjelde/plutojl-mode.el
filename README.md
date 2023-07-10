@@ -27,7 +27,7 @@ To install the Pluto.jl Notebook Mode using [straight.el](https://github.com/rax
      :straight (plutojl-mode :type git :host github :repo "torfjelde/plutojl-mode.el"))
    ```
    
-   Note that it's also highly recommended to activate `auto-revert-mode` whenever `plutojl-mode` is activated,
+   It's recommended to activate `auto-revert-mode` whenever `plutojl-mode` is activated,
    since Pluto.jl might make changes to the notebook upon saving the `.jl` file, such as rearranging cells the
    to respect the depdencies between cells. To activate `auto-revert-mode` whenever `plutojl-mode` is activated,
    
