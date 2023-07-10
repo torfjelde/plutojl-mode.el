@@ -26,6 +26,19 @@ To install the Pluto.jl Notebook Mode using [straight.el](https://github.com/rax
    (use-package plutojl-mode
      :straight (plutojl-mode :type git :host github :repo "torfjelde/plutojl-mode.el"))
    ```
+   
+   Note that it's also highly recommended to activate `auto-revert-mode` whenever `plutojl-mode` is activated,
+   since Pluto.jl might make changes to the notebook upon saving the `.jl` file, such as rearranging cells the
+   to respect the depdencies between cells. To activate `auto-revert-mode` whenever `plutojl-mode` is activated,
+   
+   ```emacs-lisp
+   (use-package plutojl-mode
+     :straight (plutojl-mode :type git :host github :repo "torfjelde/plutojl-mode.el")
+     :hook (plutojl-mode . auto-revert-mode))
+   ```
+   
+   (Note that `plutojl-mode` always tries to preserve the cursor position when the notebook is updated
+   even in scenarios where Pluto.jl rearranges the ordering.)
 
 2. Restart Emacs or evaluate the configuration by running `M-x eval-buffer`.
 
