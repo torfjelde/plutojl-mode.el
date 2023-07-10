@@ -17,6 +17,22 @@
 
 (require 'uuidgen)
 
+(defgroup plutojl nil
+  "Emacs mode for editing raw Pluto.jl notebooks."
+  :group 'languages)
+
+(defcustom plutojl-preserve-position-upon-revert t
+  "Whether to preserve the position of the point when reverting the buffer."
+  :type 'boolean
+  :group 'plutojl)
+
+;; We also want to hook into `auto-revert-mode' in two cases:
+;; - Before the buffer is reverted, we want to save the current cell UUID.
+;; - After the buffer is reverted, we want to go to the cell with the saved UUID.
+
+(defvar plutojl--auto-revert-saved-cell-uuid-and-position nil
+  "The UUID and point offset of the cell that was active before the buffer was reverted.")
+
 (defconst plutojl--cell-uuid-regexp
   "^# ╔═╡ \\([0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}\\)$")
 
@@ -32,7 +48,11 @@
 ;; TODO: Add support for disabling code blocks, etc.
 ;; More generally, add support for metadata.
 
-(defun plutojl--make-cell-order-regexp (uuid)
+(defun plutojl--make-cell-regexp (uuid)
+  "Return a regexp pattern for matching beginning cell with `uuid'."
+  (format "^# ╔═╡ %s$" uuid))
+
+(defun plutojl--make-cell-order-list-entry-regexp (uuid)
   "Return a regexp pattern for matching `uuid' in the cell order list."
   (format "^# \\(╟─\\|╠═\\)%s$" uuid))
 
@@ -55,14 +75,18 @@
         (goto-char pom)
         (error "No cell order list found")))))
 
-(defun plutojl--current-cell-uuid ()
-  "Return the UUID of the current cell."
+(defun plutojl--current-cell-uuid-and-position ()
+  "Return the UUID and the starting position of the current cell."
   (save-excursion
     (forward-line)
     (if (re-search-backward plutojl--cell-uuid-regexp nil t)
         ;; Get the match without fontification.
-        (buffer-substring-no-properties (match-beginning 1) (match-end 1))
+        (list (buffer-substring-no-properties (match-beginning 1) (match-end 1)) (point))
       (error "No cell found at point"))))
+
+(defun plutojl--current-cell-uuid ()
+  "Return the UUID of the current cell."
+  (car (plutojl--current-cell-uuid-and-position)))
 
 (defun plutojl--insert-cell-order-after (uuid previous-uuid &optional folded)
   "Insert `uuid' in the cell order list after `previous-uuid'."
@@ -76,7 +100,7 @@
     ;; or
     ;; `# ╠═ 52f6010d-ad5f-4e29-8d79-7fdf1d8acf92'
     ;; where `╟─'  indicates it's folded and `╠═' indicates it's unfolded.
-    (if (re-search-forward (plutojl--make-cell-order-regexp previous-uuid) nil t)
+    (if (re-search-forward (plutojl--make-cell-order-list-entry-regexp previous-uuid) nil t)
         (progn
           (forward-line)
           (insert (plutojl--make-cell-order-list-entry uuid folded))
@@ -95,7 +119,7 @@
     ;; or
     ;; `# ╠═ 52f6010d-ad5f-4e29-8d79-7fdf1d8acf92'
     ;; where `╟─'  indicates it's folded and `╠═' indicates it's unfolded.
-    (if (re-search-forward (plutojl--make-cell-order-regexp next-uuid) nil t)
+    (if (re-search-forward (plutojl--make-cell-order-list-entry-regexp next-uuid) nil t)
         (progn
           (beginning-of-line)
           (insert (plutojl--make-cell-order-list-entry uuid folded))
@@ -106,7 +130,7 @@
   "Return non-nil if `uuid' exists in the cell order list."
   (save-excursion
     (plutojl--go-to-cell-order-list)
-    (re-search-forward (plutojl--make-cell-order-regexp uuid) nil t)))
+    (re-search-forward (plutojl--make-cell-order-list-entry-regexp uuid) nil t)))
 
 (defun plutojl--add-to-cell-order (uuid &optional previous-uuid next-uuid folded)
   "Add `uuid' to the cell order list."
@@ -128,7 +152,7 @@
   "Delete `uuid' from the cell order list."
   (save-excursion
     (plutojl--go-to-cell-order-list)
-    (when (re-search-forward (plutojl--make-cell-order-regexp uuid) nil t)
+    (when (re-search-forward (plutojl--make-cell-order-list-entry-regexp uuid) nil t)
       (beginning-of-line)
       (kill-line)
       (kill-line))))
@@ -146,6 +170,41 @@
     (when (re-search-forward plutojl--cell-uuid-regexp nil t)
       ;; Get the match without fontification.
       (buffer-substring-no-properties (match-beginning 1) (match-end 1)))))
+
+(defun plutojl--goto-cell (uuid)
+  "Go to the cell with UUID `uuid'."
+  (let ((pom (point)))
+    (goto-char (point-min))
+    (if (re-search-forward (plutojl--make-cell-regexp uuid) nil t)
+        (beginning-of-line)
+      (progn
+        ;; Go back to where we were.
+        (goto-char pom)
+        (error "No cell with UUID %s found" uuid)))))
+
+(defun plutojl--auto-revert-handler ()
+  "Save the current cell UUID before the buffer is reverted."
+  (when plutojl-mode
+    (let ((uuid-and-pos (plutojl--current-cell-uuid-and-position)))
+      ;; NOTE: We can't use `setq-local' because local variables are not preserved
+      ;; when the buffer is reverted. If this ever causes issues, we can always make
+      ;; these variables a plist, one entry for each buffer.
+      (setq plutojl--auto-revert-saved-cell-uuid-and-offset
+            (list
+             (car uuid-and-pos)
+             (- (point) (cadr uuid-and-pos)))))))
+
+(defun plutojl--auto-revert-handler-after ()
+  "Go to the cell with the saved UUID after the buffer is reverted."
+  (when plutojl-mode
+    (when plutojl--auto-revert-saved-cell-uuid-and-offset
+      (let ((uuid (car plutojl--auto-revert-saved-cell-uuid-and-offset))
+            (offset (cadr plutojl--auto-revert-saved-cell-uuid-and-offset)))
+        (plutojl--goto-cell uuid)
+        (when offset
+          (goto-char (+ (point) offset)))
+        ;; Clear the saved UUID and offset.
+        (setq plutojl--auto-revert-saved-cell-uuid-and-offset nil)))))
 
 (defun plutojl-insert-cell-at-point (&optional arg)
   "Insert a new cell at point.
@@ -241,7 +300,7 @@ If region is active, make the region the body of the cell."
       ;; Replace the cell UUID in the cell order list with a folded cell.
       (plutojl-goto-cell-order-list)
       ;; Replace.
-      (re-search-forward (plutojl--make-cell-order-regexp uuid))
+      (re-search-forward (plutojl--make-cell-order-list-entry-regexp uuid))
       (beginning-of-line)
       (if (looking-at "^# ╟─[A-Za-z0-9\\-]+$")
           ;; Unfold.
@@ -274,7 +333,19 @@ If region is active, make the region the body of the cell."
             (define-key map (kbd "C-c C-p") 'plutojl-goto-previous-cell)
             (define-key map (kbd "C-c C-n") 'plutojl-goto-next-cell)
             (define-key map (kbd "C-c C-f") 'plutojl-toggle-fold-cell)
-            map))
+            map)
+  (cond
+   ;; This is run when we're deactivating.
+   (plutojl-mode
+    (when plutojl-preserve-position-upon-revert
+      (add-hook 'before-revert-hook #'plutojl--auto-revert-handler nil t)
+      (add-hook 'after-revert-hook #'plutojl--auto-revert-handler-after nil t)))
+
+   ;; This is run when we're activating.
+   (t
+    (when plutojl-preserve-position-upon-revert
+      (remove-hook 'before-revert-hook #'plutojl--auto-revert-handler t)
+      (remove-hook 'after-revert-hook #'plutojl--auto-revert-handler-after t)))))
 
 (provide 'plutojl-mode)
 ;;; plutojl-mode.el ends here
