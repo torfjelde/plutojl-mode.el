@@ -221,6 +221,11 @@ If region is active, make the region the body of the cell."
                             (buffer-substring-no-properties (region-beginning) (region-end))
                           (delete-region (region-beginning) (region-end)))
                    nil)))
+    ;; Go to the next cell and insert two newlines before it.
+    (plutojl-goto-next-cell)
+    (insert "\n\n")
+    (forward-line -2)
+    ;; Insert the cell UUID.
     (plutojl--add-to-cell-order uuid (plutojl--find-previous-cell-uuid) (plutojl--find-next-cell-uuid) arg)
     (insert "# ╔═╡ " uuid "\n")
     (when content
