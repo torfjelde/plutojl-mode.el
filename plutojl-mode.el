@@ -226,6 +226,42 @@ If region is active, make the region the body of the cell."
     (when content
       (insert content))))
 
+(defun plutojl-insert-org-cell-at-point (&optional arg)
+  "Insert a Org cell at point.
+
+With prefix ARG, insert a folded cell.
+
+If region is active, make the region the body of the cell."
+  (interactive "P")
+  (plutojl-insert-cell-at-point arg)
+  (insert "org\"\"\"\n")
+  (insert "\n\"\"\"")
+  (forward-line -1))
+
+(defun plutojl-insert-markdown-cell-at-point (&optional arg)
+  "Insert a Markdown cell at point.
+
+With prefix ARG, insert a folded cell.
+
+If region is active, make the region the body of the cell."
+  (interactive "P")
+  (plutojl-insert-cell-at-point arg)
+  (insert "md\"\"\"\n")
+  (insert "\n\"\"\"")
+  (forward-line -1))
+
+(defun plutojl-insert-html-cell-at-point (&optional arg)
+  "Insert a Markdown cell at point.
+
+With prefix ARG, insert a folded cell.
+
+If region is active, make the region the body of the cell."
+  (interactive "P")
+  (plutojl-insert-cell-at-point arg)
+  (insert "html\"\"\"\n")
+  (insert "\n\"\"\"")
+  (forward-line -1))
+
 (defun plutojl-goto-previous-cell ()
   "Go to the previous cell."
   (interactive)
@@ -333,6 +369,9 @@ If region is active, make the region the body of the cell."
             (define-key map (kbd "C-c C-p") 'plutojl-goto-previous-cell)
             (define-key map (kbd "C-c C-n") 'plutojl-goto-next-cell)
             (define-key map (kbd "C-c C-f") 'plutojl-toggle-fold-cell)
+            (define-key map (kbd "C-c C-o") 'plutojl-insert-org-cell-at-point)
+            (define-key map (kbd "C-c C-m") 'plutojl-insert-markdown-cell-at-point)
+            (define-key map (kbd "C-c C-h") 'plutojl-insert-html-cell-at-point)
             map)
   (cond
    ;; This is run when we're deactivating.
