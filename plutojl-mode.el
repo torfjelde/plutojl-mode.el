@@ -148,7 +148,7 @@
         (insert (plutojl--make-cell-order-list-entry uuid folded))
         (insert "\n")))))
 
-(defun plutojl--delete-from-cell-order (uuid)
+(defun plutojl--delete-from-cell-order-list (uuid)
   "Delete `uuid' from the cell order list."
   (save-excursion
     (plutojl--go-to-cell-order-list)
@@ -182,6 +182,43 @@
         (goto-char pom)
         (error "No cell with UUID %s found" uuid)))))
 
+(defun plutojl--goto-entry-in-cell-order-list (uuid)
+  "Go to the cell with UUID `uuid'."
+  (let ((pom (point)))
+    (goto-char (point-min))
+    (if (re-search-forward (plutojl--make-cell-order-list-entry-regexp uuid) nil t)
+        (beginning-of-line)
+      (progn
+        ;; Go back to where we were.
+        (goto-char pom)
+        (error "No cell with UUID %s found" uuid)))))
+
+(defun plutojl--goto-previous-cell-or-cell-order-list (arg)
+  "Go to the previous cell or cell order list."
+  ;; If we're already looking at a cell UUID, we go to the next line
+  ;; before we start searching.
+  (when (looking-at plutojl--cell-uuid-regexp)
+    (forward-line))
+  (if (re-search-backward plutojl--cell-uuid-regexp nil t)
+      (progn (goto-char (match-beginning 0))
+             (when (not (= (1- arg) 0))
+               (plutojl--goto-next-cell-or-cell-order-list (1- arg))))
+    ;; Go to the cell order list.
+    (plutojl-goto-cell-order-list)))
+
+(defun plutojl--goto-next-cell-or-cell-order-list (arg)
+  "Go to the next cell or cell order list."
+  ;; If we're already looking at a cell UUID, we go to the next line
+  ;; before we start searching.
+  (when (looking-at plutojl--cell-uuid-regexp)
+    (forward-line))
+  (if (re-search-forward plutojl--cell-uuid-regexp nil t)
+      (progn (goto-char (match-beginning 0))
+             (when (not (= (1- arg) 0))
+               (plutojl--goto-next-cell-or-cell-order-list (1- arg))))
+    ;; Go to the cell order list.
+    (plutojl-goto-cell-order-list)))
+
 (defun plutojl--auto-revert-handler ()
   "Save the current cell UUID before the buffer is reverted."
   (when plutojl-mode
@@ -206,7 +243,7 @@
         ;; Clear the saved UUID and offset.
         (setq plutojl--auto-revert-saved-cell-uuid-and-offset nil)))))
 
-(defun plutojl-insert-cell-at-point (&optional arg)
+(defun plutojl-insert-cell-at-point (arg)
   "Insert a new cell at point.
 
 With prefix ARG, insert a folded cell.
@@ -220,18 +257,24 @@ If region is active, make the region the body of the cell."
                      (prog1
                             (buffer-substring-no-properties (region-beginning) (region-end))
                           (delete-region (region-beginning) (region-end)))
-                   nil)))
-    ;; Go to the next cell and insert two newlines before it.
-    (plutojl-goto-next-cell)
-    (insert "\n\n")
-    (forward-line -2)
+                   nil))
+        (pom (point)))
+    ;; Check if we have two empty lines before point.
+    (when (not (looking-back "\n\n"))
+      ;; Go to the next cell and insert two newlines before it.
+      (plutojl-goto-next-cell 1)
+      (when (= pom (point))
+        ;; If there was no next line, we go the cell order list.
+        (plutojl-goto-cell-order-list))
+      (insert "\n\n")
+      (forward-line -2))
     ;; Insert the cell UUID.
     (plutojl--add-to-cell-order uuid (plutojl--find-previous-cell-uuid) (plutojl--find-next-cell-uuid) arg)
     (insert "# ╔═╡ " uuid "\n")
     (when content
       (insert content))))
 
-(defun plutojl-insert-org-cell-at-point (&optional arg)
+(defun plutojl-insert-org-cell-at-point (arg)
   "Insert a Org cell at point.
 
 With prefix ARG, insert a folded cell.
@@ -350,7 +393,7 @@ If region is active, make the region the body of the cell."
       ;; Replace the cell UUID in the cell order list with a folded cell.
       (plutojl-goto-cell-order-list)
       ;; Replace.
-      (re-search-forward (plutojl--make-cell-order-list-entry-regexp uuid))
+      (plutojl--goto-entry-in-cell-order-list uuid)
       (beginning-of-line)
       (if (looking-at "^# ╟─[A-Za-z0-9\\-]+$")
           ;; Unfold.
@@ -361,6 +404,79 @@ If region is active, make the region the body of the cell."
         (progn
           (replace-match (plutojl--make-cell-order-list-entry uuid t))
           (message "Folded cell %s" uuid))))))
+
+(defun plutojl--yank-cell (&optional uuid delete-from-cell-order-list)
+  "Get the cell with UUID as a string.
+
+If UUID is nil, the cell at point is used."
+  (save-excursion
+    (let ((uuid (or uuid (plutojl--current-cell-uuid))))
+      (plutojl--goto-cell uuid)
+      (let ((cell-start (point)))
+        (plutojl--goto-next-cell-or-cell-order-list 1)
+        (let ((contents (buffer-substring-no-properties cell-start (point))))
+          (delete-region cell-start (point))
+          (when delete-from-cell-order-list
+            (plutojl--yank-cell-order-list-entry uuid))
+          contents)))))
+
+(defun plutojl--yank-cell-order-list-entry (uuid)
+  "Get the cell order list entry with UUID as a string."
+  (save-excursion
+    (plutojl--goto-entry-in-cell-order-list uuid)
+    (let ((entry (buffer-substring-no-properties (point) (1+ (line-end-position)))))
+      (delete-region (point) (1+ (line-end-position)))
+      entry)))
+
+(defun plutojl-move-cell-up (arg)
+  "Move the cell at point up.
+
+The prefix ARG specifies how many cells to move down."
+  (interactive "p")
+  (let ((uuid (plutojl--current-cell-uuid)))
+    ;; First we move the cell itself down.
+    (let ((cell (plutojl--yank-cell uuid nil)))
+      (save-excursion
+        (plutojl-goto-previous-cell arg)
+        ;; Save the UUID of the cell that we're moving the target
+        ;; cell to be after.
+        (let ((last-seen-cell (plutojl--current-cell-uuid)))
+          (insert cell)
+          ;; Now we move the cell in the cell order list.
+          (plutojl--goto-entry-in-cell-order-list uuid)
+          (beginning-of-line)
+          (let ((entry (plutojl--yank-cell-order-list-entry uuid)))
+            (plutojl--goto-entry-in-cell-order-list last-seen-cell)
+            ;; We want to insert the entry after the `last-seen-cell', so we move one line down.
+            (when (not (looking-at plutojl--cell-order-list-regexp))
+              (forward-line -1))
+            (insert entry)))))
+    (pluto--goto-cell uuid)))
+
+(defun plutojl-move-cell-down (arg)
+  "Move the cell at point down.
+
+The prefix ARG specifies how many cells to move down."
+  (interactive "p")
+  (let ((uuid (plutojl--current-cell-uuid)))
+    ;; First we move the cell itself down.
+    (let ((cell (plutojl--yank-cell uuid nil)))
+      (save-excursion
+        (plutojl--goto-next-cell-or-cell-order-list arg)
+        ;; Save the UUID of the cell that we're moving the target
+        ;; cell to be after.
+        (let ((last-seen-cell (plutojl--current-cell-uuid)))
+          (insert cell)
+          ;; Now we move the cell in the cell order list.
+          (plutojl--goto-entry-in-cell-order-list uuid)
+          (beginning-of-line)
+          (let ((entry (plutojl--yank-cell-order-list-entry uuid)))
+            (plutojl--goto-entry-in-cell-order-list last-seen-cell)
+            ;; We want to insert the entry after the `last-seen-cell', so we move one line down.
+            (forward-line)
+            (insert entry)))))
+    ;; Finally, go to the cell we just moved.
+    (plutojl--goto-cell uuid)))
 
 (defun plutojl--is-plutojl-notebook ()
   "Return non-nil if the current buffer is a Pluto.jl notebook."
@@ -386,6 +502,8 @@ If region is active, make the region the body of the cell."
             (define-key map (kbd "C-c C-o") 'plutojl-insert-org-cell-at-point)
             (define-key map (kbd "C-c C-m") 'plutojl-insert-markdown-cell-at-point)
             (define-key map (kbd "C-c C-h") 'plutojl-insert-html-cell-at-point)
+            (define-key map (kbd "M-<down>") 'plutojl-move-cell-down)
+            (define-key map (kbd "M-<up>") 'plutojl-move-cell-up)
             map)
   (cond
    ;; This is run when we're deactivating.
