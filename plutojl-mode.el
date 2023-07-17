@@ -67,8 +67,8 @@
   ;; The cell order list is identified by `# ╔═╡ Cell order:'
   ;; It is a list of UUIDs, one per line.
   (let ((pom (point)))
-    (goto-char (point-min))
-    (if (re-search-forward plutojl--cell-order-list-regexp nil t)
+    (goto-char (point-max))
+    (if (re-search-backward plutojl--cell-order-list-regexp nil t)
         (goto-char (match-beginning 0))
       ;; Go back otherwise.
       (progn
@@ -243,7 +243,7 @@ If region is active, make the region the body of the cell."
   (insert "\n\"\"\"")
   (forward-line -1))
 
-(defun plutojl-insert-markdown-cell-at-point (&optional arg)
+(defun plutojl-insert-markdown-cell-at-point (arg)
   "Insert a Markdown cell at point.
 
 With prefix ARG, insert a folded cell.
@@ -255,7 +255,7 @@ If region is active, make the region the body of the cell."
   (insert "\n\"\"\"")
   (forward-line -1))
 
-(defun plutojl-insert-html-cell-at-point (&optional arg)
+(defun plutojl-insert-html-cell-at-point (arg)
   "Insert a Markdown cell at point.
 
 With prefix ARG, insert a folded cell.
@@ -267,21 +267,28 @@ If region is active, make the region the body of the cell."
   (insert "\n\"\"\"")
   (forward-line -1))
 
-(defun plutojl-goto-previous-cell ()
+(defun plutojl-goto-previous-cell (arg)
   "Go to the previous cell."
-  (interactive)
+  (interactive "p")
   (when (re-search-backward plutojl--cell-uuid-regexp nil t)
-    (goto-char (match-beginning 0))))
+    (goto-char (match-beginning 0)))
+  (when (not (= (1- arg) 0))
+    (plutojl-goto-previous-cell (1- arg))))
 
-(defun plutojl-goto-next-cell ()
+(defun plutojl-goto-next-cell (arg)
   "Go to the previous cell."
-  (interactive)
+  (interactive "p")
   ;; If we're already looking at a cell UUID, we go to the next line
   ;; before we start searching.
   (when (looking-at plutojl--cell-uuid-regexp)
     (forward-line))
   (when (re-search-forward plutojl--cell-uuid-regexp nil t)
-    (goto-char (match-beginning 0))))
+    (goto-char (match-beginning 0)))
+  ;; In case we've moved one line forward, we go back one line.
+  (when (not (looking-at plutojl--cell-uuid-regexp))
+    (forward-line -1))
+  (when (not (<= (1- arg) 0))
+    (plutojl-goto-next-cell (1- arg))))
 
 (defun plutojl-goto-project-toml ()
   "Go to the Project.toml section."
@@ -303,9 +310,9 @@ If region is active, make the region the body of the cell."
       ;; Go back otherwise.
       (goto-char pom))))
 
-(defun plutojl-delete-cell-at-point ()
+(defun plutojl-delete-cell-at-point (arg)
   "Delete the cell at point."
-  (interactive)
+  (interactive "p")
   (save-excursion
       ;; In case the pointer is pointing at a cell UUID, we
       ;; go to the next line before we start searchng backwards.
@@ -320,13 +327,15 @@ If region is active, make the region the body of the cell."
           (error "This shouldn't happen"))
         (let ((uuid (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
           ;; Now we locate the next cell.
-          (when (not (plutojl-goto-next-cell))
+          (when (not (plutojl-goto-next-cell 1))
             (when (not (plutojl-goto-cell-order-list))
               (error "No cell or cell order found; is this a Pluto.jl notebook?")))
 
           (let ((end (point)))
             (delete-region start end)
-            (plutojl--delete-from-cell-order uuid))))))
+            (plutojl--delete-from-cell-order-list uuid)))))
+  (when (not (= (1- arg) 0))
+    (plutojl-delete-cell-at-point (1- arg))))
 
 (defun plutojl-goto-cell-order-list ()
   "Go to the cell order list."
