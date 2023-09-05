@@ -493,15 +493,15 @@ The prefix ARG specifies how many cells to move down."
     ;; Go to the top of the buffer.
     (goto-char (point-min))
     ;; Get all the UUIDs from the cells themselves (not the cell list).
-    (let ((uuids ()))
+    (let ((uuids-reverse ()))
       (while (re-search-forward plutojl--cell-uuid-regexp nil t)
-        (push (match-string 1) uuids))
+        (push (match-string 1) uuids-reverse))
       ;; Brings us to the beginning of the cell-order list.
       (plutojl-goto-cell-order-list)
       ;; Need to move one line forward to get to the first entry.
       (forward-line)
       ;; Now we can replace the cell order list with the new one.
-      (let ((cell-order-list (plutojl--create-cell-order-list uuids)))
+      (let ((cell-order-list (plutojl--create-cell-order-list (reverse uuids-reverse))))
         (delete-region (point) (point-max))
         (insert cell-order-list))
       (insert "\n"))))
