@@ -157,8 +157,8 @@
     (plutojl--go-to-cell-order-list)
     (when (re-search-forward (plutojl--make-cell-order-list-entry-regexp uuid) nil t)
       (beginning-of-line)
-      (kill-line)
-      (kill-line))))
+      (delete-line)
+      (delete-line))))
 
 (defun plutojl--find-previous-cell-uuid ()
   "Return the UUID of the previous cell."
