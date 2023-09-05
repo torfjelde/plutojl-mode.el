@@ -260,16 +260,18 @@ If region is active, make the region the body of the cell."
                    nil))
         (pom (point)))
     ;; Check if we have two empty lines before point.
-    (when (not (looking-back "\n\n"))
+    (when (not (looking-back "\n\n" nil))
       ;; Go to the next cell and insert two newlines before it.
-      (plutojl-goto-next-cell 1)
+      (plutojl--goto-next-cell-or-cell-order-list 1)
       (when (= pom (point))
         ;; If there was no next line, we go the cell order list.
         (plutojl-goto-cell-order-list))
       (insert "\n\n")
       (forward-line -2))
     ;; Insert the cell UUID.
-    (plutojl--add-to-cell-order uuid (plutojl--find-previous-cell-uuid) (plutojl--find-next-cell-uuid) arg)
+    (plutojl--add-to-cell-order
+     uuid
+     (plutojl--find-previous-cell-uuid) (plutojl--find-next-cell-uuid) arg)
     (insert "# ╔═╡ " uuid "\n")
     (when content
       (insert content))))
@@ -357,26 +359,24 @@ If region is active, make the region the body of the cell."
   "Delete the cell at point."
   (interactive "p")
   (save-excursion
-      ;; In case the pointer is pointing at a cell UUID, we
-      ;; go to the next line before we start searchng backwards.
-      ;; This won't cause any issues if the next line is a cell UUID
-      ;; since the pointer will be at the beginning of the line.
-      (forward-line)
-      (when (not (plutojl-goto-previous-cell))
-        (error "No cell found at point"))
-      (let ((start (point)))
-        ;; Extract the UUID of the cell we're deleting.
-        (when (not (re-search-forward plutojl--cell-uuid-regexp nil t))
-          (error "This shouldn't happen"))
-        (let ((uuid (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
-          ;; Now we locate the next cell.
-          (when (not (plutojl-goto-next-cell 1))
-            (when (not (plutojl-goto-cell-order-list))
-              (error "No cell or cell order found; is this a Pluto.jl notebook?")))
-
-          (let ((end (point)))
-            (delete-region start end)
-            (plutojl--delete-from-cell-order-list uuid)))))
+    ;; In case the pointer is pointing at a cell UUID, we
+    ;; go to the next line before we start searchng backwards.
+    ;; This won't cause any issues if the next line is a cell UUID
+    ;; since the pointer will be at the beginning of the line.
+    (forward-line)
+    (plutojl-goto-previous-cell 1)
+    (when (not (looking-at plutojl--cell-uuid-regexp))
+      (error "No cell found at point"))
+    (let ((start (point)))
+      ;; Extract the UUID of the cell we're deleting.
+      (when (not (re-search-forward plutojl--cell-uuid-regexp nil t))
+        (error "This shouldn't happen"))
+      (let ((uuid (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
+        ;; Now we locate the next cell.
+        (plutojl--goto-next-cell-or-cell-order-list 1)
+        (let ((end (point)))
+          (delete-region start end)
+          (plutojl--delete-from-cell-order-list uuid)))))
   (when (not (= (1- arg) 0))
     (plutojl-delete-cell-at-point (1- arg))))
 
@@ -451,7 +451,7 @@ The prefix ARG specifies how many cells to move down."
             (when (not (looking-at plutojl--cell-order-list-regexp))
               (forward-line -1))
             (insert entry)))))
-    (pluto--goto-cell uuid)))
+    (plutojl--goto-cell uuid)))
 
 (defun plutojl-move-cell-down (arg)
   "Move the cell at point down.
