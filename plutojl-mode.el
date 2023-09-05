@@ -45,6 +45,9 @@
 (defconst plutojl--manifest-toml-regexp
   "^# ╔═╡ 00000000-0000-0000-0000-000000000002$")
 
+(defconst plutojl--folded-state-regexp
+  "^# ╟─[A-Za-z0-9\\-]+$")
+
 ;; TODO: Add support for disabling code blocks, etc.
 ;; More generally, add support for metadata.
 
@@ -395,7 +398,7 @@ If region is active, make the region the body of the cell."
       ;; Replace.
       (plutojl--goto-entry-in-cell-order-list uuid)
       (beginning-of-line)
-      (if (looking-at "^# ╟─[A-Za-z0-9\\-]+$")
+      (if (looking-at plutojl--folded-state-regexp)
           ;; Unfold.
           (progn
             (replace-match (plutojl--make-cell-order-list-entry uuid nil))
@@ -416,7 +419,7 @@ If region is active, make the region the body of the cell."
         (progn
           (plutojl--goto-entry-in-cell-order-list uuid)
           (beginning-of-line)
-          (looking-at "^# ╟─[A-Za-z0-9\\-]+$"))
+          (looking-at plutojl--folded-state-regexp))
       (error nil))))
 
 (defun plutojl--yank-cell (&optional uuid delete-from-cell-order-list)
