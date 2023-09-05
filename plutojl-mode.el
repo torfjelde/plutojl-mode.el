@@ -478,6 +478,35 @@ The prefix ARG specifies how many cells to move down."
     ;; Finally, go to the cell we just moved.
     (plutojl--goto-cell uuid)))
 
+(defun plutojl--create-cell-order-list (uuids)
+  "Create a cell order list from UUIDS."
+  ;; TODO: Preserve folding state if it already exists in the current cell order?
+  (mapconcat (lambda (uuid)
+               (plutojl--make-cell-order-list-entry uuid nil))
+             uuids
+             "\n"))
+
+(defun plutojl-force-order ()
+  "Force the cell order list to match the order of the cells in the buffer."
+  (interactive)
+  (save-excursion
+    ;; Go to the top of the buffer.
+    (goto-char (point-min))
+    ;; Get all the UUIDs from the cells themselves (not the cell list).
+    (let ((uuids ()))
+      (while (re-search-forward plutojl--cell-uuid-regexp nil t)
+        (push (match-string 1) uuids))
+      ;; Brings us to the beginning of the cell-order list.
+      (plutojl-goto-cell-order-list)
+      ;; Need to move one line forward to get to the first entry.
+      (forward-line)
+      ;; Now we can replace the cell order list with the new one.
+      (let ((cell-order-list (plutojl--create-cell-order-list uuids)))
+        (delete-region (point) (point-max))
+        (insert cell-order-list))
+      (insert "\n"))))
+
+
 (defun plutojl--is-plutojl-notebook ()
   "Return non-nil if the current buffer is a Pluto.jl notebook."
   (save-excursion
