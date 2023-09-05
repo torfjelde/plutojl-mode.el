@@ -405,6 +405,20 @@ If region is active, make the region the body of the cell."
           (replace-match (plutojl--make-cell-order-list-entry uuid t))
           (message "Folded cell %s" uuid))))))
 
+(defun plutojl--get-folded-state (uuid)
+  "Get the folded state of the cell with UUID."
+  (save-excursion
+    (plutojl-goto-cell-order-list)
+    ;; Try to find the cell UUID in the cell order list.
+    ;; Otherwise, we return nil.
+    ;; Use try-catch since `plutojl--goto-entry-in-cell-order-list' errors if the cell UUID isn't found.
+    (condition-case nil
+        (progn
+          (plutojl--goto-entry-in-cell-order-list uuid)
+          (beginning-of-line)
+          (looking-at "^# ╟─[A-Za-z0-9\\-]+$"))
+      (error nil))))
+
 (defun plutojl--yank-cell (&optional uuid delete-from-cell-order-list)
   "Get the cell with UUID as a string.
 
@@ -482,7 +496,7 @@ The prefix ARG specifies how many cells to move down."
   "Create a cell order list from UUIDS."
   ;; TODO: Preserve folding state if it already exists in the current cell order?
   (mapconcat (lambda (uuid)
-               (plutojl--make-cell-order-list-entry uuid nil))
+               (plutojl--make-cell-order-list-entry uuid (plutojl--get-folded-state uuid)))
              uuids
              "\n"))
 
